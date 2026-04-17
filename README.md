@@ -1,20 +1,18 @@
 # Extended Block Variations
 
-Extends WordPress theme.json block style variations with custom properties for external stylesheets and default state configuration.
+Extends WordPress theme.json block style variations with custom properties for external stylesheets.
 
 ## Overview
 
-WordPress supports defining block style variations in theme.json partials located in the `/styles/` directory. However, the native implementation doesn't support:
-- Linking external CSS files to style variations, either by style_handle or by file: reference
-- Setting a variation as the default for a block type
+WordPress supports defining block style variations in theme.json partials located in the `/styles/` directory. However, the native implementation doesn't support linking external CSS files to style variations, either by style_handle or by file: reference.
 
-This plugin adds support for these features through custom properties in your theme.json variation files.
+This plugin adds support for this feature through a custom property in your theme.json variation files.
 
 ## Usage
 
-### Custom Properties
+### Custom Property
 
-Add these custom properties to your block style variation JSON files in `themes/your-theme/styles/.../*.json`:
+Add this custom property to your block style variation JSON files in `themes/your-theme/styles/.../*.json`:
 
 #### `stylesheet` (string)
 
@@ -22,10 +20,6 @@ Path to an external stylesheet or a registered style handle.
 
 - **File references**: Use `"file:./path/to/file.css"` to reference a CSS file relative to the JSON file's location
 - **Style handles**: Use a string matching a registered WordPress style handle
-
-#### `default` (boolean)
-
-Set to `true` to make this variation the default for its block type(s). (Note that this will not override other existing defaults set for a block type.)
 
 ### Example
 
@@ -39,7 +33,6 @@ Set to `true` to make this variation the default for its block type(s). (Note th
   "slug": "primary",
   "blockTypes": ["core/button"],
   "stylesheet": "file:./primary-button.css",
-  "default": true,
   "styles": {
     "color": {
       "background": "var:preset|color|primary",
@@ -86,12 +79,12 @@ If you've already registered a style handle via `wp_register_style()`, reference
 ## How It Works
 
 1. The plugin scans the theme's `/styles/` directory for JSON files
-2. Files containing `stylesheet` or `default` properties are identified as extended variations
+2. Files containing a `stylesheet` property are identified as extended variations
 3. For `file:` references:
    - The path is resolved relative to the JSON file's location
    - A unique style handle is generated based on the file path
    - The stylesheet is registered with WordPress
-4. Block styles are registered via `register_block_style()` with the resolved handles and default flags
+4. Block styles are registered via `register_block_style()` with the resolved handles
 5. WordPress merges these registrations with the theme's existing style definitions
 
 ## Compatibility
@@ -111,4 +104,8 @@ Processes and registers all extended block style variations with WordPress.
 
 The plugin automatically hooks into `after_setup_theme`, so extended variations are processed whenever your theme loads. No additional configuration is required.
 
-Simply add the custom "stylesheet" or "default" custom properties to your theme's existing `/styles/` directory JSON files, and they'll be automatically detected and processed.
+Simply add the custom "stylesheet" property to your theme's existing `/styles/` directory JSON files, and they'll be automatically detected and processed.
+
+## Setting Default Block Styles
+
+To configure default block styling, use theme.json to set styles at the block level rather than the variation level. This is the WordPress-native approach and ensures proper inheritance and overrides.

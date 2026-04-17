@@ -17,7 +17,6 @@ use WP_Theme_JSON_Resolver;
  * Extends WordPress core's WP_Theme_JSON_Resolver to handle custom properties
  * in theme.json style variation files, specifically:
  * - "stylesheet": file reference or handle for external CSS
- * - "default": boolean to mark variation as default for the block
  */
 class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 
@@ -45,7 +44,7 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 
 	/**
 	 * Find and return the full parsed JSON of any "extended" block variations,
-	 * as in those which define "stylesheet" or "default" custom properties.
+	 * as in those which define a "stylesheet" custom property.
 	 *
 	 * Re-runs Core's theme.json styles partial detection, which will reload
 	 * parsed JSON data from an internal cache.
@@ -83,13 +82,12 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 		}
 
 		// Read and filter the JSON files down to only those describing extended
-		// variations. A variation is considered "extended" if it defines any of
-		// our custom properties.
+		// variations. A variation is considered "extended" if it defines a stylesheet.
 		$variations = [];
 		foreach ( $variation_files as $file_path => $file ) {
 			// read_json_file caches data so it is only read from disk once.
 			$variation = parent::read_json_file( $file_path );
-			if ( isset( $variation['stylesheet'] ) || isset( $variation['default'] ) ) {
+			if ( isset( $variation['stylesheet'] ) ) {
 				// Translate the style variation title appropriately.
 				$translated = parent::translate( $variation, wp_get_theme()->get( 'TextDomain' ) );
 				// Keep track of file_path so we can resolve relative "file:"
@@ -153,9 +151,9 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 	}
 
 	/**
-	 * Registers extended block styles with custom stylesheet and default properties.
+	 * Registers extended block styles with custom stylesheet properties.
 	 *
-	 * Re-registers variations in PHP to apply stylesheet handles and is_default flags,
+	 * Re-registers variations in PHP to apply stylesheet handles,
 	 * which aren't supported in theme.json partials. WordPress will merge these
 	 * definitions with the theme.json styles.
 	 */
@@ -175,11 +173,6 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 				// Add style handle if stylesheet was resolved.
 				if ( ! empty( $style_handle ) ) {
 					$args['style_handle'] = $style_handle;
-				}
-
-				// Set as default if specified.
-				if ( ! empty( $variation['default'] ) ) {
-					$args['is_default'] = true;
 				}
 
 				register_block_style( $block_name, $args );
