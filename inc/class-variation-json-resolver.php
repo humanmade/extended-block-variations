@@ -147,36 +147,119 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 			filemtime( $stylesheet_path )
 		);
 
-		return $registered ? $style_handle : '';
+		if ( ! $registered ) {
+			return '';
+		}
+
+		// Add path data for potential inlining.
+		wp_style_add_data( $style_handle, 'path', $stylesheet_path );
+
+		// Check for RTL version.
+		$rtl_file_path = str_replace( '.css', '-rtl.css', $stylesheet_path );
+		if ( file_exists( $rtl_file_path ) ) {
+			wp_style_add_data( $style_handle, 'rtl', 'replace' );
+			if ( is_rtl() ) {
+				wp_style_add_data( $style_handle, 'path', $rtl_file_path );
+			}
+		}
+
+		return $style_handle;
 	}
 
 	/**
-	 * Registers extended block styles with custom stylesheet properties.
+	 * Enqueues stylesheets for extended block style variations.
 	 *
-	 * Re-registers variations in PHP to apply stylesheet handles,
-	 * which aren't supported in theme.json partials. WordPress will merge these
-	 * definitions with the theme.json styles.
+	 * Block styles are registered via theme.json partials by WordPress core.
+	 * This method only handles enqueueing the associated stylesheets, either
+	 * immediately or on-demand when blocks render.
 	 */
 	public static function register_extended_block_styles(): void {
+		$load_on_demand = wp_should_load_block_assets_on_demand();
+
 		foreach ( static::get_extended_block_variations() as $variation ) {
 			$json_path = $variation['json_path'] ?? '';
-			$style_handle = static::get_variation_style_handle( $json_path, $variation['stylesheet'] ?? null );
-			$variation_slug = $variation['slug'] ?? '';
+			$stylesheet_ref = $variation['stylesheet'] ?? null;
 
-			// Register for each block type this variation applies to.
+			// Skip if no stylesheet is defined.
+			if ( empty( $stylesheet_ref ) ) {
+				continue;
+			}
+
+			$variation_slug = $variation['slug'] ?? '';
+			$style_handle = static::get_variation_style_handle( $json_path, $stylesheet_ref );
+
+			// Skip if stylesheet couldn't be resolved.
+			if ( empty( $style_handle ) ) {
+				continue;
+			}
+
+			// Get stylesheet details for wp_enqueue_block_style.
+			$stylesheet_path = static::get_stylesheet_path_from_handle( $style_handle );
+			$stylesheet_url = static::get_stylesheet_url_from_handle( $style_handle );
+
+			// Enqueue for each block type this variation applies to.
 			foreach ( $variation['blockTypes'] ?? [] as $block_name ) {
-				$args = [
-					'name'  => $variation_slug,
-					'label' => $variation['title'] ?? $variation_slug,
+				$enqueue_args = [
+					'handle' => $style_handle,
+					'src'    => $stylesheet_url,
+					'deps'   => [],
+					'ver'    => $stylesheet_path ? filemtime( $stylesheet_path ) : false,
+					'media'  => 'all',
 				];
 
-				// Add style handle if stylesheet was resolved.
-				if ( ! empty( $style_handle ) ) {
-					$args['style_handle'] = $style_handle;
+				// Add path for potential inlining.
+				if ( $stylesheet_path ) {
+					$enqueue_args['path'] = $stylesheet_path;
 				}
 
-				register_block_style( $block_name, $args );
+				if ( $load_on_demand ) {
+					// Enqueue on-demand when block renders with this variation class.
+					$hook_name = "render_block_{$block_name}";
+					add_filter(
+						$hook_name,
+						static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
+							// Check if block has the variation class.
+							if ( ! empty( $block_content ) && str_contains( $block_content, "is-style-{$variation_slug}" ) ) {
+								wp_enqueue_block_style( $block_name, $enqueue_args );
+							}
+							return $block_content;
+						},
+						10,
+						2
+					);
+				} else {
+					// Enqueue immediately.
+					wp_enqueue_block_style( $block_name, $enqueue_args );
+				}
 			}
 		}
+	}
+
+	/**
+	 * Retrieves the filesystem path for a registered stylesheet handle.
+	 *
+	 * @param string $handle The stylesheet handle.
+	 * @return string|null The filesystem path or null if not found.
+	 */
+	private static function get_stylesheet_path_from_handle( string $handle ): ?string {
+		$wp_styles = wp_styles();
+		if ( isset( $wp_styles->registered[ $handle ]->extra['path'] ) ) {
+			return $wp_styles->registered[ $handle ]->extra['path'];
+		}
+		return null;
+	}
+
+	/**
+	 * Retrieves the URL for a registered stylesheet handle.
+	 *
+	 * @param string $handle The stylesheet handle.
+	 * @return string|false The stylesheet URL or false if not found.
+	 */
+	private static function get_stylesheet_url_from_handle( string $handle ) {
+		$wp_styles = wp_styles();
+		if ( isset( $wp_styles->registered[ $handle ]->src ) ) {
+			return $wp_styles->registered[ $handle ]->src;
+		}
+		return false;
 	}
 }

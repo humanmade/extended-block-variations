@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: Extended Block Variations
- * Description: Extends theme.json block style variations with custom properties for stylesheets.
+ * Description: Extends theme.json block style variations to support external stylesheets via the "stylesheet" property.
  * Author: Human Made
  * Version: 1.0.0
  */
