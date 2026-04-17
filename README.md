@@ -98,7 +98,7 @@ This plugin extends core WordPress functionality and follows the same file struc
 
 ## API Reference
 
-### `Extended_Block_Variations\register_extended_block_styles(): void`
+### `Extended_Block_Variations\register_variation_stylesheets(): void`
 
 Enqueues stylesheets for block style variations that define a custom `stylesheet` property. Handles both immediate and on-demand loading based on theme configuration.
 

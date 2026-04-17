@@ -12,7 +12,7 @@ namespace Extended_Block_Variations;
  * defined in theme.json partials with the custom "stylesheet" property.
  */
 function bootstrap() {
-	add_action( 'after_setup_theme', __NAMESPACE__ . '\\register_extended_block_styles' );
+	add_action( 'after_setup_theme', __NAMESPACE__ . '\\register_variation_stylesheets' );
 }
 
 /**
@@ -22,7 +22,7 @@ function bootstrap() {
  * This function only handles enqueueing the associated stylesheets, either
  * immediately or on-demand when blocks render.
  */
-function register_extended_block_styles() {
+function register_variation_stylesheets() {
 	$load_on_demand = wp_should_load_block_assets_on_demand();
 
 	foreach ( Variation_JSON_Resolver::get_extended_block_variations() as $variation ) {
