@@ -215,6 +215,15 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 				if ( $load_on_demand ) {
 					// Enqueue on-demand when block renders with this variation class.
 					$hook_name = "render_block_{$block_name}";
+					/*
+					* The filter's callback here is an anonymous function because
+					* using a named function in this case is difficult, as in core.
+					*
+					* The function cannot be unhooked, however, users are still able
+					* to dequeue the stylesheets registered/enqueued by the callback
+					* which is why in this case, using an anonymous function
+					* was deemed acceptable.
+					*/
 					add_filter(
 						$hook_name,
 						static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
