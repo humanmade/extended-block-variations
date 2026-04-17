@@ -227,8 +227,8 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 					add_filter(
 						$hook_name,
 						static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
-							// Check if block has the variation class.
-							if ( ! empty( $block_content ) && str_contains( $block_content, "is-style-{$variation_slug}" ) ) {
+							// Check if block has the variation class in its className attribute.
+							if ( ! empty( $block['attrs']['className'] ) && str_contains( $block['attrs']['className'], "is-style-{$variation_slug}" ) ) {
 								wp_enqueue_block_style( $block_name, $enqueue_args );
 							}
 							return $block_content;
