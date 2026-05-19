@@ -177,11 +177,15 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 	}
 
 	if ( $load_on_demand ) {
-		// Enqueue on-demand when block renders with this variation class.
-		$hook_name = "render_block_{$block_name}";
 		/*
+		* Hook into render_block (not render_block_{name}) at priority 1 so that
+		* wp_enqueue_block_style()'s own render_block callback (added at priority 10)
+		* still fires for the SAME block. render_block fires before render_block_{name},
+		* so calling wp_enqueue_block_style() from render_block_{name} would miss the
+		* current block entirely.
+		*
 		* The filter's callback here is an anonymous function because
-		* using a named function in this case is difficult, as in core.
+		* using a named function in this case is not possible.
 		*
 		* The function cannot be unhooked, however, users are still able
 		* to dequeue the stylesheets registered/enqueued by the callback
@@ -189,15 +193,20 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 		* was deemed acceptable.
 		*/
 		add_filter(
-			$hook_name,
+			'render_block',
 			static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
-				// Check if block has the variation class in its className attribute.
-				if ( ! empty( $block['attrs']['className'] ) && str_contains( $block['attrs']['className'], "is-style-{$variation_slug}" ) ) {
+				// Check if this is the right block type with the variation class applied.
+				if (
+					! empty( $block['blockName'] ) &&
+					$block_name === $block['blockName'] &&
+					! empty( $block['attrs']['className'] ) &&
+					str_contains( $block['attrs']['className'], "is-style-{$variation_slug}" )
+				) {
 					wp_enqueue_block_style( $block_name, $enqueue_args );
 				}
 				return $block_content;
 			},
-			10,
+			1,
 			2
 		);
 	} else {
