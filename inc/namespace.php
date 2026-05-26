@@ -143,19 +143,13 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 
 	if ( $load_on_demand ) {
 		/*
-		* Hook into render_block (not render_block_{name}) at priority 1 so that
-		* wp_enqueue_block_style()'s own render_block callback (added at priority 10)
-		* still fires for the SAME block. render_block fires before render_block_{name},
-		* so calling wp_enqueue_block_style() from render_block_{name} would miss the
-		* current block entirely.
+		* Hook into render_block (not render_block_{name}, which fires too late)
+		* at priority 1 so that our styles are registered before core enqueues
+		* stylesheets later on within the render_block hook.
 		*
-		* The filter's callback here is an anonymous function because
-		* using a named function in this case is not possible.
-		*
-		* The function cannot be unhooked, however, users are still able
-		* to dequeue the stylesheets registered/enqueued by the callback
-		* which is why in this case, using an anonymous function
-		* was deemed acceptable.
+		* Using a named function is not possible in this case, so this logic
+		* cannot be unhooked. However, the stylesheets can be dequeued if needed
+		* which is why an anonymous function on a hook was deemed acceptable.
 		*/
 		add_filter(
 			'render_block',
