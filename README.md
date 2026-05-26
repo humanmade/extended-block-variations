@@ -113,8 +113,6 @@ The plugin integrates with WordPress's block asset loading strategies:
 
 ## Integration with Theme
 
-## Integration with Theme
-
 WordPress core automatically registers block style variations from theme.json partials in the `/styles/` directory. This plugin enhances that process by:
 
 1. Detecting variations with custom `stylesheet` properties
