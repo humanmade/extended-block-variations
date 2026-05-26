@@ -50,6 +50,20 @@ function register_variation_stylesheets() {
 }
 
 /**
+ * Compute a hash for an asset file, with a fallback to filemtime if hashing fails.
+ *
+ * @param string $asset_file_path Path to an asset on disk.
+ * @return string|false Hash or filemtime of the specified file.
+ */
+function get_version_hash( string $asset_file_path ): string|false {
+	$file_hash = false;
+	if ( function_exists( 'hash_file' ) ) {
+		$file_hash = hash_file( 'crc32', $asset_file_path );
+	}
+	return ( $file_hash ?: (string) filemtime( $asset_file_path ) ) ?: false;
+}
+
+/**
  * Resolves and registers a stylesheet from a variation's stylesheet property.
  *
  * Handles "file:" references by resolving them relative to the JSON file's directory,
@@ -86,13 +100,13 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 	$relative_to_theme = str_replace( trailingslashit( $theme_dir ), '', $stylesheet_path );
 	$style_handle = 'block-style-' . str_replace( [ '/', '.' ], '-', $relative_to_theme );
 
-	// Register the stylesheet with file modification time as version.
+	// Register the stylesheet with a file-derived version.
 	$stylesheet_uri = get_theme_file_uri( $relative_to_theme );
 	$registered = wp_register_style(
 		$style_handle,
 		$stylesheet_uri,
 		[],
-		filemtime( $stylesheet_path )
+		get_version_hash( $stylesheet_path )
 	);
 
 	if ( ! $registered ) {
@@ -132,7 +146,7 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 		'handle' => $style_handle,
 		'src'    => $stylesheet_url,
 		'deps'   => [],
-		'ver'    => $stylesheet_path ? filemtime( $stylesheet_path ) : false,
+		'ver'    => $stylesheet_path ? get_version_hash( $stylesheet_path ) : false,
 		'media'  => 'all',
 	];
 
