@@ -28,13 +28,6 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 	private static ?array $variations = null;
 
 	/**
-	 * Cached block-level stylesheets array.
-	 *
-	 * @var array|null
-	 */
-	private static ?array $block_stylesheets = null;
-
-	/**
 	 * Returns an array of all nested JSON files within a given directory.
 	 *
 	 * Copied from WP_Theme_JSON_Resolver::recursively_iterate_json.
@@ -106,44 +99,6 @@ class Variation_JSON_Resolver extends WP_Theme_JSON_Resolver {
 
 		static::$variations = $variations;
 		return $variations;
-	}
-
-	/**
-	 * Find and return block-level stylesheet definitions from theme.json.
-	 *
-	 * Reads the active theme's theme.json and returns any blocks under
-	 * styles.blocks that define a custom "stylesheet" property.
-	 *
-	 * @return array Array of entries with 'block_name', 'stylesheet', and 'json_path' keys.
-	 */
-	public static function get_extended_block_stylesheets(): array {
-		if ( is_array( self::$block_stylesheets ) ) {
-			return self::$block_stylesheets;
-		}
-
-		$theme_json_path = get_stylesheet_directory() . '/theme.json';
-
-		if ( ! file_exists( $theme_json_path ) ) {
-			self::$block_stylesheets = [];
-			return self::$block_stylesheets;
-		}
-
-		$theme_json = parent::read_json_file( $theme_json_path );
-		$blocks     = $theme_json['styles']['blocks'] ?? [];
-
-		$block_stylesheets = [];
-		foreach ( $blocks as $block_name => $block_data ) {
-			if ( isset( $block_data['stylesheet'] ) ) {
-				$block_stylesheets[] = [
-					'block_name' => $block_name,
-					'stylesheet' => $block_data['stylesheet'],
-					'json_path'  => $theme_json_path,
-				];
-			}
-		}
-
-		self::$block_stylesheets = $block_stylesheets;
-		return self::$block_stylesheets;
 	}
 
 }

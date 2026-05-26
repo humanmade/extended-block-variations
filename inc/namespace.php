@@ -13,7 +13,6 @@ namespace Extended_Block_Variations;
  */
 function bootstrap() {
 	add_action( 'after_setup_theme', __NAMESPACE__ . '\\register_variation_stylesheets' );
-	add_action( 'after_setup_theme', __NAMESPACE__ . '\\register_block_stylesheets' );
 }
 
 /**
@@ -47,40 +46,6 @@ function register_variation_stylesheets() {
 		foreach ( $variation['blockTypes'] ?? [] as $block_name ) {
 			enqueue_variation_style_for_block( $block_name, $variation_slug, $style_handle, $load_on_demand );
 		}
-	}
-}
-
-/**
- * Enqueues stylesheets defined at the block level in theme.json.
- *
- * Reads styles.blocks.{block_name}.stylesheet from theme.json and enqueues
- * each stylesheet via wp_enqueue_block_style(), which handles on-demand loading
- * natively — the stylesheet is only included when the block appears on the page.
- */
-function register_block_stylesheets(): void {
-	foreach ( Variation_JSON_Resolver::get_extended_block_stylesheets() as $block ) {
-		$style_handle = get_variation_style_handle( $block['json_path'], $block['stylesheet'] );
-
-		if ( empty( $style_handle ) ) {
-			continue;
-		}
-
-		$stylesheet_path = get_stylesheet_path( $style_handle );
-		$stylesheet_url  = get_stylesheet_url( $style_handle );
-
-		$enqueue_args = [
-			'handle' => $style_handle,
-			'src'    => $stylesheet_url,
-			'deps'   => [],
-			'ver'    => $stylesheet_path ? filemtime( $stylesheet_path ) : false,
-			'media'  => 'all',
-		];
-
-		if ( $stylesheet_path ) {
-			$enqueue_args['path'] = $stylesheet_path;
-		}
-
-		wp_enqueue_block_style( $block['block_name'], $enqueue_args );
 	}
 }
 
