@@ -13,11 +13,6 @@ namespace Extended_Block_Variations;
  */
 function bootstrap() {
 	add_action( 'after_setup_theme', __NAMESPACE__ . '\\register_variation_stylesheets' );
-	add_action( 'wp_enqueue_scripts', function() {
-		error_log( 'registering' );
-		wp_register_style( 'something', 'https://www.kadamwhite.com/style.css', [], false );
-		wp_enqueue_style( 'something' );
-	} );
 }
 
 /**
