@@ -139,18 +139,10 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
  * @param bool   $load_on_demand Whether to load on-demand or immediately.
  */
 function enqueue_variation_style_for_block( string $block_name, string $variation_slug, string $style_handle, bool $load_on_demand ): void {
+	// The style is already registered; only pass handle and path (for potential inlining).
+	$enqueue_args = [ 'handle' => $style_handle ];
+
 	$stylesheet_path = get_stylesheet_path( $style_handle );
-	$stylesheet_url = get_stylesheet_url( $style_handle );
-
-	$enqueue_args = [
-		'handle' => $style_handle,
-		'src'    => $stylesheet_url,
-		'deps'   => [],
-		'ver'    => $stylesheet_path ? get_version_hash( $stylesheet_path ) : false,
-		'media'  => 'all',
-	];
-
-	// Add path for potential inlining.
 	if ( $stylesheet_path ) {
 		$enqueue_args['path'] = $stylesheet_path;
 	}
@@ -202,16 +194,3 @@ function get_stylesheet_path( string $handle ): ?string {
 	return null;
 }
 
-/**
- * Retrieves the URL for a registered stylesheet handle.
- *
- * @param string $handle The stylesheet handle.
- * @return string|false The stylesheet URL or false if not found.
- */
-function get_stylesheet_url( string $handle ) {
-	$wp_styles = wp_styles();
-	if ( isset( $wp_styles->registered[ $handle ]->src ) ) {
-		return $wp_styles->registered[ $handle ]->src;
-	}
-	return false;
-}
