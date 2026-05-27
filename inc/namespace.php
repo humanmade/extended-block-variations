@@ -149,14 +149,14 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 
 	if ( $load_on_demand ) {
 		/*
-		* Hook into render_block (not render_block_{name}, which fires too late)
-		* at priority 1 so that our styles are registered before core enqueues
-		* stylesheets later on within the render_block hook.
-		*
-		* Using a named function is not possible in this case, so this logic
-		* cannot be unhooked. However, the stylesheets can be dequeued if needed
-		* which is why an anonymous function on a hook was deemed acceptable.
-		*/
+		 * Hook into render_block (not render_block_{name}, which fires too late)
+		 * at priority 1 so that our styles are registered before core enqueues
+		 * stylesheets later on within the render_block hook.
+		 *
+		 * Using a named function is not possible in this case, so this logic
+		 * cannot be unhooked. However, the stylesheets can be dequeued if needed
+		 * which is why an anonymous function on a hook was deemed acceptable.
+		 */
 		add_filter(
 			'render_block',
 			static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
