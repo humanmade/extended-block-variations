@@ -76,6 +76,16 @@ If you've already registered a style handle via `wp_register_style()`, reference
 }
 ```
 
+### Versioning stylesheets
+
+WordPress normally sets block asset versions based on the version string in block.json. Since the schema for block style variation JSON partials does not include a version number, you can manually specify a version string in your stylesheet reference:
+
+```json
+"stylesheet": "file:/variation-styles.css?ver=1.0.2"
+```
+
+If you omit the `ver` parameter, a version string will be computed by hashing the stylesheet. This requires an inefficient full-file read operation on every registration call, so this auto-versioning should only be used as a fallback convenience while actively developing styles.
+
 ## How It Works
 
 1. WordPress core reads theme.json partials from `/styles/` and registers block style variations

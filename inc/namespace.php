@@ -50,12 +50,20 @@ function register_variation_stylesheets() {
 }
 
 /**
- * Compute a hash for an asset file, with a fallback to filemtime if hashing fails.
+ * Derive and return the version string for a stylesheet.
+ *
+ * Uses the ?ver= query from a stylesheet reference string when present, falling
+ * back to a file hash and then to filemtime if hashing fails. Version string is
+ * preferred for maximum performance.
  *
  * @param string $asset_file_path Path to an asset on disk.
  * @return string|false Hash or filemtime of the specified file.
  */
-function get_version_hash( string $asset_file_path ): string|false {
+function get_version_hash( string $asset_file_path, string $stylesheet_ref ): string|false {
+	if ( preg_match( '/[?&]ver=([^&]+)/', $stylesheet_ref, $matches ) ) {
+		return rawurldecode( $matches[1] );
+	}
+
 	$file_hash = false;
 	if ( function_exists( 'hash_file' ) ) {
 		$file_hash = hash_file( 'crc32', $asset_file_path );
@@ -86,6 +94,9 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 	// Remove the "file:" prefix using WordPress core function.
 	$relative_path = remove_block_asset_path_prefix( $stylesheet_ref );
 
+	// Remove any version string or query arguments.
+	$relative_path = preg_replace( '/\?.*$/', '', $relative_path );
+
 	// Resolve relative to the JSON file's directory.
 	$json_dir = dirname( $json_path );
 	$stylesheet_path = wp_normalize_path( realpath( $json_dir . '/' . $relative_path ) );
@@ -106,7 +117,7 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 		$style_handle,
 		$stylesheet_uri,
 		[],
-		get_version_hash( $stylesheet_path )
+		get_version_hash( $stylesheet_path, $stylesheet_ref )
 	);
 
 	if ( ! $registered ) {
