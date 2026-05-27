@@ -50,6 +50,28 @@ function register_variation_stylesheets() {
 }
 
 /**
+ * Derive and return the version string for a stylesheet.
+ *
+ * Uses the ?ver= query from a stylesheet reference string when present, falling
+ * back to a file hash and then to filemtime if hashing fails. Version string is
+ * preferred for maximum performance.
+ *
+ * @param string $asset_file_path Path to an asset on disk.
+ * @return string|false Hash or filemtime of the specified file.
+ */
+function get_version_hash( string $asset_file_path, string $stylesheet_ref ): string|false {
+	if ( preg_match( '/[?&]ver=([^&]+)/', $stylesheet_ref, $matches ) ) {
+		return rawurldecode( $matches[1] );
+	}
+
+	$file_hash = false;
+	if ( function_exists( 'hash_file' ) ) {
+		$file_hash = hash_file( 'crc32', $asset_file_path );
+	}
+	return ( $file_hash ?: (string) filemtime( $asset_file_path ) ) ?: false;
+}
+
+/**
  * Resolves and registers a stylesheet from a variation's stylesheet property.
  *
  * Handles "file:" references by resolving them relative to the JSON file's directory,
@@ -72,6 +94,9 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 	// Remove the "file:" prefix using WordPress core function.
 	$relative_path = remove_block_asset_path_prefix( $stylesheet_ref );
 
+	// Remove any version string or query arguments.
+	$relative_path = preg_replace( '/\?.*$/', '', $relative_path );
+
 	// Resolve relative to the JSON file's directory.
 	$json_dir = dirname( $json_path );
 	$stylesheet_path = wp_normalize_path( realpath( $json_dir . '/' . $relative_path ) );
@@ -86,13 +111,13 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 	$relative_to_theme = str_replace( trailingslashit( $theme_dir ), '', $stylesheet_path );
 	$style_handle = 'block-style-' . str_replace( [ '/', '.' ], '-', $relative_to_theme );
 
-	// Register the stylesheet with file modification time as version.
+	// Register the stylesheet with a file-derived version.
 	$stylesheet_uri = get_theme_file_uri( $relative_to_theme );
 	$registered = wp_register_style(
 		$style_handle,
 		$stylesheet_uri,
 		[],
-		filemtime( $stylesheet_path )
+		get_version_hash( $stylesheet_path, $stylesheet_ref )
 	);
 
 	if ( ! $registered ) {
@@ -125,32 +150,24 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
  * @param bool   $load_on_demand Whether to load on-demand or immediately.
  */
 function enqueue_variation_style_for_block( string $block_name, string $variation_slug, string $style_handle, bool $load_on_demand ): void {
+	// The style is already registered; only pass handle and path (for potential inlining).
+	$enqueue_args = [ 'handle' => $style_handle ];
+
 	$stylesheet_path = get_stylesheet_path( $style_handle );
-	$stylesheet_url = get_stylesheet_url( $style_handle );
-
-	$enqueue_args = [
-		'handle' => $style_handle,
-		'src'    => $stylesheet_url,
-		'deps'   => [],
-		'ver'    => $stylesheet_path ? filemtime( $stylesheet_path ) : false,
-		'media'  => 'all',
-	];
-
-	// Add path for potential inlining.
 	if ( $stylesheet_path ) {
 		$enqueue_args['path'] = $stylesheet_path;
 	}
 
 	if ( $load_on_demand ) {
 		/*
-		* Hook into render_block (not render_block_{name}, which fires too late)
-		* at priority 1 so that our styles are registered before core enqueues
-		* stylesheets later on within the render_block hook.
-		*
-		* Using a named function is not possible in this case, so this logic
-		* cannot be unhooked. However, the stylesheets can be dequeued if needed
-		* which is why an anonymous function on a hook was deemed acceptable.
-		*/
+		 * Hook into render_block (not render_block_{name}, which fires too late)
+		 * at priority 1 so that our styles are registered before core enqueues
+		 * stylesheets later on within the render_block hook.
+		 *
+		 * Using a named function is not possible in this case, so this logic
+		 * cannot be unhooked. However, the stylesheets can be dequeued if needed
+		 * which is why an anonymous function on a hook was deemed acceptable.
+		 */
 		add_filter(
 			'render_block',
 			static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
@@ -188,16 +205,3 @@ function get_stylesheet_path( string $handle ): ?string {
 	return null;
 }
 
-/**
- * Retrieves the URL for a registered stylesheet handle.
- *
- * @param string $handle The stylesheet handle.
- * @return string|false The stylesheet URL or false if not found.
- */
-function get_stylesheet_url( string $handle ) {
-	$wp_styles = wp_styles();
-	if ( isset( $wp_styles->registered[ $handle ]->src ) ) {
-		return $wp_styles->registered[ $handle ]->src;
-	}
-	return false;
-}
