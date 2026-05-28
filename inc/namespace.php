@@ -16,11 +16,12 @@ function bootstrap() {
 }
 
 /**
- * Enqueues stylesheets for extended block style variations.
+ * Sets up render_block filters or enqueue actions for extended block style variations.
  *
  * Block styles are registered via theme.json partials by WordPress core.
- * This function only handles enqueueing the associated stylesheets, either
- * immediately or on-demand when blocks render.
+ * This function sets up an enqueueing mechanism for associated stylesheets,
+ * which are enqueued while rendering a relevant variation (or globally on
+ * wp_enqueue_scripts if on-demand loading is not enabled).
  */
 function register_variation_stylesheets() {
 	$load_on_demand = wp_should_load_block_assets_on_demand();
@@ -35,16 +36,16 @@ function register_variation_stylesheets() {
 		}
 
 		$variation_slug = $variation['slug'] ?? '';
-		$style_handle = get_variation_style_handle( $json_path, $stylesheet_ref );
+		$style_args = get_variation_stylesheet_args( $json_path, $stylesheet_ref );
 
 		// Skip if stylesheet couldn't be resolved.
-		if ( empty( $style_handle ) ) {
+		if ( empty( $style_args ) ) {
 			continue;
 		}
 
 		// Enqueue for each block type this variation applies to.
 		foreach ( $variation['blockTypes'] ?? [] as $block_name ) {
-			enqueue_variation_style_for_block( $block_name, $variation_slug, $style_handle, $load_on_demand );
+			enqueue_variation_style_for_block( $block_name, $variation_slug, $style_args, $load_on_demand );
 		}
 	}
 }
@@ -72,23 +73,23 @@ function get_version_hash( string $asset_file_path, string $stylesheet_ref ): st
 }
 
 /**
- * Resolves and registers a stylesheet from a variation's stylesheet property.
+ * Resolves a variation's stylesheet reference into enqueueable args.
  *
  * Handles "file:" references by resolving them relative to the JSON file's directory,
- * or returns the handle directly if already registered.
+ * or returns a handle-only array for already-registered handles.
  *
  * @param string  $json_path      The filesystem path to the JSON file containing the reference.
  * @param ?string $stylesheet_ref The stylesheet property value (e.g., "file:./style.css" or "my-handle").
- * @return string The registered style handle, or empty string if not set/invalid.
+ * @return array Stylesheet args (handle, and optionally src/path/ver/deps/media), or empty array if invalid.
  */
-function get_variation_style_handle( string $json_path, ?string $stylesheet_ref ): string {
+function get_variation_stylesheet_args( string $json_path, ?string $stylesheet_ref ): array {
 	if ( empty( $stylesheet_ref ) ) {
-		return '';
+		return [];
 	}
 
 	// Not a file reference - assume it's an already-registered handle.
 	if ( ! str_starts_with( $stylesheet_ref, 'file:' ) ) {
-		return $stylesheet_ref;
+		return [ 'handle' => $stylesheet_ref ];
 	}
 
 	// Remove the "file:" prefix using WordPress core function.
@@ -103,7 +104,7 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 
 	// Verify the file exists before registering.
 	if ( ! $stylesheet_path || ! file_exists( $stylesheet_path ) ) {
-		return '';
+		return [];
 	}
 
 	// Generate a unique handle based on the file path.
@@ -111,53 +112,28 @@ function get_variation_style_handle( string $json_path, ?string $stylesheet_ref 
 	$relative_to_theme = str_replace( trailingslashit( $theme_dir ), '', $stylesheet_path );
 	$style_handle = 'block-style-' . str_replace( [ '/', '.' ], '-', $relative_to_theme );
 
-	// Register the stylesheet with a file-derived version.
-	$stylesheet_uri = get_theme_file_uri( $relative_to_theme );
-	$registered = wp_register_style(
-		$style_handle,
-		$stylesheet_uri,
-		[],
-		get_version_hash( $stylesheet_path, $stylesheet_ref )
-	);
-
-	if ( ! $registered ) {
-		return '';
-	}
-
-	// Add path data for potential inlining.
-	wp_style_add_data( $style_handle, 'path', $stylesheet_path );
-
-	// Check for RTL version.
-	$rtl_file_path = str_replace( '.css', '-rtl.css', $stylesheet_path );
-	if ( file_exists( $rtl_file_path ) ) {
-		wp_style_add_data( $style_handle, 'rtl', 'replace' );
-		if ( is_rtl() ) {
-			wp_style_add_data( $style_handle, 'path', $rtl_file_path );
-		}
-	}
-
-	return $style_handle;
+	return [
+		'handle' => $style_handle,
+		'src'    => get_theme_file_uri( $relative_to_theme ),
+		'path'   => $stylesheet_path,
+		'ver'    => get_version_hash( $stylesheet_path, $stylesheet_ref ),
+	];
 }
 
 /**
  * Enqueues a variation stylesheet for a specific block type.
  *
  * Handles both immediate enqueueing and on-demand loading via render_block hooks.
+ * For on-demand loading, mirrors core's wp_enqueue_block_style behavior and
+ * registers the sheet inside a render_block callback. For immediate loading,
+ * delegates to wp_enqueue_block_style which defers to wp_enqueue_scripts.
  *
  * @param string $block_name     The block type name (e.g., 'core/button').
  * @param string $variation_slug The variation slug (e.g., 'outline').
- * @param string $style_handle   The registered stylesheet handle.
+ * @param array  $style_args     Stylesheet args from get_variation_stylesheet_args().
  * @param bool   $load_on_demand Whether to load on-demand or immediately.
  */
-function enqueue_variation_style_for_block( string $block_name, string $variation_slug, string $style_handle, bool $load_on_demand ): void {
-	// The style is already registered; only pass handle and path (for potential inlining).
-	$enqueue_args = [ 'handle' => $style_handle ];
-
-	$stylesheet_path = get_stylesheet_path( $style_handle );
-	if ( $stylesheet_path ) {
-		$enqueue_args['path'] = $stylesheet_path;
-	}
-
+function enqueue_variation_style_for_block( string $block_name, string $variation_slug, array $style_args, bool $load_on_demand ): void {
 	if ( $load_on_demand ) {
 		/*
 		 * Hook into render_block (not render_block_{name}, which fires too late)
@@ -170,7 +146,7 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 		 */
 		add_filter(
 			'render_block',
-			static function ( $block_content, $block ) use ( $variation_slug, $block_name, $enqueue_args ) {
+			function ( $block_content, $block ) use ( $variation_slug, $block_name, $style_args ) {
 				// Check if this is the right block type with the variation class applied.
 				if (
 					! empty( $block['blockName'] ) &&
@@ -178,7 +154,7 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 					! empty( $block['attrs']['className'] ) &&
 					str_contains( $block['attrs']['className'], "is-style-{$variation_slug}" )
 				) {
-					wp_enqueue_block_style( $block_name, $enqueue_args );
+					enqueue_variation_style( $style_args );
 				}
 				return $block_content;
 			},
@@ -187,21 +163,31 @@ function enqueue_variation_style_for_block( string $block_name, string $variatio
 		);
 	} else {
 		// Enqueue immediately.
-		wp_enqueue_block_style( $block_name, $enqueue_args );
+		wp_enqueue_block_style( $block_name, $style_args );
 	}
 }
 
 /**
- * Retrieves the filesystem path for a registered stylesheet handle.
+ * Registers and enqueues a variation stylesheet.
  *
- * @param string $handle The stylesheet handle.
- * @return string|null The filesystem path or null if not found.
+ * Called from within a render_block callback, mirroring the internal callback
+ * structure used by wp_enqueue_block_style.
+ *
+ * @param array $args Stylesheet args array (handle, source, path, version).
  */
-function get_stylesheet_path( string $handle ): ?string {
-	$wp_styles = wp_styles();
-	if ( isset( $wp_styles->registered[ $handle ]->extra['path'] ) ) {
-		return $wp_styles->registered[ $handle ]->extra['path'];
-	}
-	return null;
-}
+function enqueue_variation_style( array $args ): void {
+	if ( ! wp_style_is( $args['handle'], 'registered' ) && isset( $args['src'] ) && isset( $args['path'] ) ) {
+		wp_register_style( $args['handle'], $args['src'], $args['deps'] ?? [], $args['ver'] ?? false );
+		wp_style_add_data( $args['handle'], 'path', $args['path'] );
 
+		$rtl_file_path = str_replace( '.css', '-rtl.css', $args['path'] );
+		if ( file_exists( $rtl_file_path ) ) {
+			wp_style_add_data( $args['handle'], 'rtl', 'replace' );
+			if ( is_rtl() ) {
+				wp_style_add_data( $args['handle'], 'path', $rtl_file_path );
+			}
+		}
+	}
+
+	wp_enqueue_style( $args['handle'] );
+}
