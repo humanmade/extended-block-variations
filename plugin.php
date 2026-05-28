@@ -3,7 +3,7 @@
  * Plugin Name: Extended Block Variations
  * Description: Extends theme.json block style variations to support external stylesheets via the "stylesheet" property.
  * Author: Human Made
- * Version: 1.0.0
+ * Version: 1.1.0
  */
 
 namespace Extended_Block_Variations;
